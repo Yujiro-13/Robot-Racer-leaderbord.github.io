@@ -67,14 +67,14 @@ async function connectBLE() {
         bleDevice = await navigator.bluetooth.requestDevice({
             filters: [
                 { namePrefix: 'ESP32' },
-                { services: ['6E400001-B5A3-F393-E0A9-E50E24DCCA9E'] }
+                { services: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'] }
             ],
-            optionalServices: ['6E400001-B5A3-F393-E0A9-E50E24DCCA9E']
+            optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
         });
 
         const server = await bleDevice.gatt.connect();
-        const service = await server.getPrimaryService('6E400001-B5A3-F393-E0A9-E50E24DCCA9E');
-        bleCharacteristic = await service.getCharacteristic('6E400002-B5A3-F393-E0A9-E50E24DCCA9E');
+        const service = await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+        bleCharacteristic = await service.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
 
         // 通知を有効化
         await bleCharacteristic.startNotifications();
