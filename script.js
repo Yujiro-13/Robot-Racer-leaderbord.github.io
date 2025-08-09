@@ -2,7 +2,7 @@
 let bleDevice = null;
 let bleCharacteristic = null;
 let timerInterval = null;
-let timerSeconds = 300; // 5分 = 300秒
+let timerSeconds = 180; // 3分 = 180秒
 let isTimerRunning = false;
 
 // リアルタイム計測タイマー
@@ -197,7 +197,7 @@ function stopTimer() {
 
 function resetTimer() {
     stopTimer();
-    timerSeconds = 300;
+    timerSeconds = 180;
     updateTimerDisplay();
     updateTimerButton();
 }
