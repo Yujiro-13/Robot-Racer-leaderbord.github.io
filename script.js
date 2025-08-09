@@ -35,6 +35,12 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDefaultCSV(); // デフォルトCSVの読み込み
     updateDisplay();
     updateRealtimeButtonState(); // ボタン状態の初期化
+    
+    // 自動記録モードをデフォルトでONに設定
+    if (document.getElementById('autoRecordMode').checked === false) {
+        document.getElementById('autoRecordMode').checked = true;
+        toggleAutoRecord();
+    }
 });
 
 // データ保存・読み込み
@@ -305,11 +311,15 @@ function addCurrentTimeAuto() {
             // 走行回数を記録数と自動同期
             updateRoundFromRecords();
             
+            // 自動記録時にランキングも自動更新
+            updateRanking();
+            
             // 前回結果は次回のゴール時まで保持（リセットしない）
             // manualTimeのみクリア
             document.getElementById('manualTime').value = '';
             
             console.log(`第${currentRound}走のタイムを自動記録: ${formatTimeDisplay(timeInSeconds)}`);
+            console.log('ランキングを自動更新しました');
         }
     }
 }
