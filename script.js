@@ -621,7 +621,15 @@ function handleCSVFile(event) {
     if (file && file.type === 'text/csv') {
         const reader = new FileReader();
         reader.onload = function(e) {
-            const csvText = e.target.result;
+            let csvText = e.target.result;
+            
+            // 文字化けチェック：不正な文字が含まれている場合はShift_JISとして再読み込み
+            if (csvText.includes('�') || csvText.includes('ï¿½')) {
+                console.log('UTF-8で文字化けを検出、Shift_JISで再読み込みします');
+                readAsShiftJIS(file);
+                return;
+            }
+            
             parseCSV(csvText);
             alert('CSVファイルを読み込みました！');
         };
@@ -631,19 +639,83 @@ function handleCSVFile(event) {
     }
 }
 
+// Shift_JISで読み込む関数
+function readAsShiftJIS(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            // ArrayBufferを取得
+            const buffer = e.target.result;
+            
+            // TextDecoderを使用してShift_JISでデコード
+            const decoder = new TextDecoder('shift_jis');
+            const csvText = decoder.decode(buffer);
+            
+            parseCSV(csvText);
+            alert('CSVファイルを読み込みました！（Shift_JIS）');
+        } catch (error) {
+            console.error('Shift_JISでの読み込みに失敗:', error);
+            
+            // Shift_JISに失敗した場合、元のUTF-8で読み込み直し
+            const reader2 = new FileReader();
+            reader2.onload = function(e2) {
+                const csvText = e2.target.result;
+                parseCSV(csvText);
+                alert('CSVファイルを読み込みました！（UTF-8、一部文字化けの可能性があります）');
+            };
+            reader2.readAsText(file, 'UTF-8');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
 function parseCSV(csvText) {
     const lines = csvText.trim().split('\n');
     entryList = [];
     
-    // ヘッダー行をスキップ（1行目）
-    for (let i = 1; i < lines.length; i++) {
+    console.log('CSVデータ:', csvText); // デバッグ用
+    
+    let startIndex = 0;
+    
+    // 最初の行がヘッダーかどうかを判定
+    if (lines.length > 0) {
+        const firstLine = lines[0].trim();
+        // ヘッダー行の可能性がある場合（「エントリーナンバー」「エントリー名」などが含まれる）
+        if (firstLine.includes('エントリー') || firstLine.includes('ナンバー') || firstLine.includes('名') || firstLine.includes('ロボット')) {
+            startIndex = 1; // ヘッダー行をスキップ
+            console.log('ヘッダー行を検出、スキップします:', firstLine);
+        }
+    }
+    
+    for (let i = startIndex; i < lines.length; i++) {
         const line = lines[i].trim();
         if (line) {
-            const columns = line.split(',').map(col => col.trim().replace(/"/g, ''));
+            // カンマ区切り、タブ区切り、スペース区切りに対応
+            let columns;
+            
+            if (line.includes(',')) {
+                // カンマ区切り
+                columns = line.split(',').map(col => col.trim().replace(/"/g, ''));
+            } else if (line.includes('\t')) {
+                // タブ区切り
+                columns = line.split('\t').map(col => col.trim());
+            } else {
+                // スペース区切り（複数スペースを1つの区切りとして扱う）
+                columns = line.split(/\s+/).filter(col => col.length > 0);
+            }
+            
+            console.log(`行${i + 1}:`, columns); // デバッグ用
+            
             if (columns.length >= 2) {
+                // エントリーナンバーに#を付加（存在しない場合）
+                let entryNumber = columns[0];
+                if (!entryNumber.startsWith('#')) {
+                    entryNumber = '#' + entryNumber.padStart(3, '0');
+                }
+                
                 entryList.push({
-                    number: columns[0],
-                    name: columns[1],
+                    number: entryNumber,
+                    name: columns[1] || '',
                     robotName: columns[2] || '' // 3列目があればロボット名、なければ空文字
                 });
             }
