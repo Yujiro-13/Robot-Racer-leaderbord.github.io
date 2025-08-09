@@ -130,16 +130,13 @@ function handleBLEData(event) {
         // ボタン状態を更新
         updateRealtimeButtonState();
         
-        // ESP32のタイムを固定フォーマットで表示
-        const timeInSeconds = parseFloat(timeValue);
-        const formattedTime = formatTimeDisplay(timeInSeconds);
-        
-        document.getElementById('realtimeTimer').textContent = formattedTime;
+        // ESP32のタイムでリアルタイムタイマーを上書き（最終確定値）
+        document.getElementById('realtimeTimer').textContent = timeValue;
         document.getElementById('realtimeTimer').style.color = '#e53e3e';
         
-        // 前回結果として表示（receivedTime）- MM:SS.mmm形式で表示
-        document.getElementById('receivedTime').textContent = formattedTime;
-        document.getElementById('manualTime').value = timeValue; // 入力フィールドには元の数値
+        // 前回結果として表示（receivedTime）
+        document.getElementById('receivedTime').textContent = timeValue;
+        document.getElementById('manualTime').value = timeValue;
         
         // 自動記録モードの場合、自動で記録追加
         if (autoRecordMode) {
@@ -150,21 +147,18 @@ function handleBLEData(event) {
         
         console.log('ESP32計測タイム確定:', timeValue);
     } else if (value === 'RESTART') {
-        // ESP32からリスタート信号受信 - タイマーリセット後、即座に再開始
+        // ESP32からリスタート信号受信 - タイマーリセット&再スタート
         stopRealTimeMeasurement();
-        document.getElementById('realtimeTimer').textContent = '00:00.000';
+        document.getElementById('realtimeTimer').textContent = '00.000';
         document.getElementById('realtimeTimer').style.color = '#1a202c';
-        
-        // 少し遅延してから新しい計測を開始（リセット表示を確認できるように）
-        setTimeout(() => {
-            startRealTimeMeasurement();
-            updateRealtimeButtonState();
-        }, 100); // 0.1秒後に再開始
-        
-        console.log('ESP32リスタート信号受信 - タイマーリセット&再開始');
+        // タイマーを即座に再開
+        startRealTimeMeasurement();
+        // ボタン状態を更新
+        updateRealtimeButtonState();
+        console.log('ESP32リスタート信号受信 - タイマーリセット&再スタート');
     } else if (value === 'READY') {
         // ESP32がリセット完了 - 新しい走行準備
-        document.getElementById('realtimeTimer').textContent = '00:00.000';
+        document.getElementById('realtimeTimer').textContent = '00.000';
         document.getElementById('realtimeTimer').style.color = '#38a169';
         console.log('ESP32リセット完了');
     }
@@ -234,83 +228,53 @@ function updateTimerButton() {
 function updateReceivedTime() {
     const manualTime = document.getElementById('manualTime').value;
     if (manualTime) {
-        const timeInSeconds = parseFloat(manualTime);
-        if (!isNaN(timeInSeconds)) {
-            document.getElementById('receivedTime').textContent = formatTimeDisplay(timeInSeconds);
-        } else {
-            document.getElementById('receivedTime').textContent = manualTime;
-        }
+        document.getElementById('receivedTime').textContent = manualTime;
     }
 }
 
 function addCurrentTime() {
-    const displayedTime = document.getElementById('receivedTime').textContent;
-    const manualTimeValue = document.getElementById('manualTime').value;
-    
-    // 手動入力値があればそれを、なければBLEから受信した値を使用
-    let timeValue = manualTimeValue || displayedTime;
-    
-    if (timeValue && timeValue !== '00:00.000' && timeValue !== '未記録' && timeValue !== '--:--.-') {
-        // MM:SS.mmm形式から秒数に変換（必要な場合）
-        let timeInSeconds;
-        if (timeValue.includes(':')) {
-            // MM:SS.mmm形式の場合、秒数に変換
-            const parts = timeValue.split(':');
-            const minutes = parseInt(parts[0]);
-            const seconds = parseFloat(parts[1]);
-            timeInSeconds = minutes * 60 + seconds;
-        } else {
-            // 既に秒数の場合
-            timeInSeconds = parseFloat(timeValue);
-        }
+    const timeValue = document.getElementById('receivedTime').textContent;
+    if (timeValue && timeValue !== '00.000' && timeValue !== '未記録') {
+        const currentRound = parseInt(document.getElementById('currentRound').value);
+        currentRecordsList.push({
+            round: currentRound,
+            time: parseFloat(timeValue),
+            type: 'time'
+        });
         
-        if (!isNaN(timeInSeconds)) {
-            const currentRound = parseInt(document.getElementById('currentRound').value);
-            currentRecordsList.push({
-                round: currentRound,
-                time: timeInSeconds,
-                type: 'time'
-            });
-            
-            updateDisplay();
-            saveData();
-            
-            // 走行回数を記録数と自動同期
-            updateRoundFromRecords();
-            
-            // 前回結果は次回のゴール時まで保持（リセットしない）
-            // manualTimeのみクリア
-            document.getElementById('manualTime').value = '';
-        }
+        updateDisplay();
+        saveData();
+        
+        // 走行回数を記録数と自動同期
+        updateRoundFromRecords();
+        
+        // 前回結果は次回のゴール時まで保持（リセットしない）
+        // manualTimeのみクリア
+        document.getElementById('manualTime').value = '';
     }
 }
 
 function addCurrentTimeAuto() {
-    const manualTimeValue = document.getElementById('manualTime').value;
-    
-    if (manualTimeValue && manualTimeValue !== '00.000' && manualTimeValue !== '--:--.-') {
-        const timeInSeconds = parseFloat(manualTimeValue);
+    const timeValue = document.getElementById('receivedTime').textContent;
+    if (timeValue && timeValue !== '00.000' && timeValue !== '未記録') {
+        const currentRound = parseInt(document.getElementById('currentRound').value);
+        currentRecordsList.push({
+            round: currentRound,
+            time: parseFloat(timeValue),
+            type: 'time'
+        });
         
-        if (!isNaN(timeInSeconds)) {
-            const currentRound = parseInt(document.getElementById('currentRound').value);
-            currentRecordsList.push({
-                round: currentRound,
-                time: timeInSeconds,
-                type: 'time'
-            });
-            
-            updateDisplay();
-            saveData();
-            
-            // 走行回数を記録数と自動同期
-            updateRoundFromRecords();
-            
-            // 前回結果は次回のゴール時まで保持（リセットしない）
-            // manualTimeのみクリア
-            document.getElementById('manualTime').value = '';
-            
-            console.log(`第${currentRound}走のタイムを自動記録: ${formatTimeDisplay(timeInSeconds)}`);
-        }
+        updateDisplay();
+        saveData();
+        
+        // 走行回数を記録数と自動同期
+        updateRoundFromRecords();
+        
+        // 前回結果は次回のゴール時まで保持（リセットしない）
+        // manualTimeのみクリア
+        document.getElementById('manualTime').value = '';
+        
+        console.log(`第${currentRound}走のタイムを自動記録: ${timeValue}秒`);
     }
 }
 
@@ -403,7 +367,7 @@ function updateDisplay() {
             } else {
                 return `<div class="record-item">
                     <span>第${record.round}走</span>
-                    <span style="font-weight: bold; color: #667eea;">${formatTimeDisplay(record.time)}</span>
+                    <span style="font-weight: bold; color: #667eea;">${record.time.toFixed(3)}秒</span>
                     <button class="button" onclick="removeRecord(${index})" style="padding: 5px 10px; font-size: 12px;">削除</button>
                 </div>`;
             }
@@ -414,12 +378,12 @@ function updateDisplay() {
     const validTimes = currentRecordsList.filter(record => record.type === 'time').map(record => record.time);
     if (validTimes.length > 0) {
         const bestTime = Math.min(...validTimes);
-        document.getElementById('currentBestTime').textContent = `ベスト: ${formatTimeDisplay(bestTime)}`;
+        document.getElementById('currentBestTime').textContent = `ベスト: ${bestTime.toFixed(3)}秒`;
         
         // 順位計算
         calculateCurrentPosition(bestTime);
     } else {
-        document.getElementById('currentBestTime').textContent = 'ベスト: --:--.-';
+        document.getElementById('currentBestTime').textContent = 'ベスト: --.-';
         document.getElementById('currentPosition').textContent = '-位';
     }
 
@@ -485,7 +449,7 @@ function updateRanking() {
     
     updateDisplay();
     saveData();
-    // アラート削除: alert('ランキングを更新しました！');
+    alert('ランキングを更新しました！');
 }
 
 function clearRanking() {
@@ -516,7 +480,7 @@ function updateRankingDisplay() {
                 ${displayName}
             </div>
             <div style="font-size: 1.2em; font-weight: bold; color: #667eea;">
-                ${formatTimeDisplay(entry.bestTime)}
+                ${entry.bestTime.toFixed(3)}秒
             </div>
         </div>`;
     }).join('');
@@ -563,13 +527,7 @@ function updateRealTimeDisplay() {
     if (isMeasuring && measurementStartTime) {
         const currentTime = performance.now();
         const elapsedSeconds = (currentTime - measurementStartTime) / 1000;
-        
-        // 固定フォーマット（分:秒.ミリ秒）で表示
-        const minutes = Math.floor(elapsedSeconds / 60);
-        const seconds = elapsedSeconds % 60;
-        const formattedTime = String(minutes).padStart(2, '0') + ':' + seconds.toFixed(3).padStart(6, '0');
-        
-        document.getElementById('realtimeTimer').textContent = formattedTime;
+        document.getElementById('realtimeTimer').textContent = elapsedSeconds.toFixed(3);
         
         // requestAnimationFrameで次の更新をスケジュール（最高速）
         if (isMeasuring) {
@@ -695,7 +653,7 @@ function resetCurrentEntryData() {
     resetTimer();
     
     // 計測タイムをリセット（前回の結果を「未記録」表示）
-    document.getElementById('receivedTime').textContent = '--:--.-';
+    document.getElementById('receivedTime').textContent = '未記録';
     document.getElementById('manualTime').value = '';
     
     // 表示を更新
@@ -723,7 +681,7 @@ function resetRealtimeTimer() {
     stopRealTimeMeasurement();
     
     // 表示をリセット
-    document.getElementById('realtimeTimer').textContent = '00:00.000';
+    document.getElementById('realtimeTimer').textContent = '00.000';
     document.getElementById('realtimeTimer').style.color = '#1a202c';
     
     // ボタン状態を更新
@@ -745,4 +703,484 @@ function updateRealtimeButtonState() {
         button.textContent = 'スタート';
         button.className = 'button success';
     }
+}
+
+// タイマー機能
+function toggleTimer() {
+    if (isTimerRunning) {
+        stopTimer();
+    } else {
+        startTimer();
+    }
+}
+
+function startTimer() {
+    if (!isTimerRunning) {
+        isTimerRunning = true;
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimerButton();
+    }
+}
+
+function stopTimer() {
+    isTimerRunning = false;
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+    updateTimerButton();
+}
+
+function resetTimer() {
+    stopTimer();
+    timerSeconds = 300;
+    updateTimerDisplay();
+    updateTimerButton();
+}
+
+function updateTimer() {
+    if (timerSeconds > 0) {
+        timerSeconds--;
+        updateTimerDisplay();
+    } else {
+        stopTimer();
+        alert('⏰ タイムアップ！');
+    }
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(timerSeconds / 60);
+    const seconds = timerSeconds % 60;
+    document.getElementById('timerDisplay').textContent = 
+        String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+}
+
+function updateTimerButton() {
+    const toggleBtn = document.getElementById('toggleTimerBtn');
+    if (isTimerRunning) {
+        toggleBtn.textContent = 'ストップ';
+        toggleBtn.className = 'button danger';
+    } else {
+        toggleBtn.textContent = 'スタート';
+        toggleBtn.className = 'button success';
+    }
+}
+
+// 記録管理
+function updateReceivedTime() {
+    const manualTime = document.getElementById('manualTime').value;
+    if (manualTime) {
+        document.getElementById('receivedTime').textContent = manualTime;
+    }
+}
+
+function addCurrentTime() {
+    const timeValue = document.getElementById('receivedTime').textContent;
+    if (timeValue && timeValue !== '00.000' && timeValue !== '未記録') {
+        const currentRound = parseInt(document.getElementById('currentRound').value);
+        currentRecordsList.push({
+            round: currentRound,
+            time: parseFloat(timeValue),
+            type: 'time'
+        });
+        
+        updateDisplay();
+        saveData();
+        
+        // ラウンド自動更新
+        if (currentRound < 5) {
+            document.getElementById('currentRound').value = currentRound + 1;
+            updateRound();
+        }
+        
+        // 前回結果は次回のゴール時まで保持（リセットしない）
+        // manualTimeのみクリア
+        document.getElementById('manualTime').value = '';
+    }
+}
+
+// 自動記録用の関数（通知なし）
+function addCurrentTimeAuto() {
+    const timeValue = document.getElementById('receivedTime').textContent;
+    if (timeValue && timeValue !== '00.000' && timeValue !== '未記録') {
+        const currentRound = parseInt(document.getElementById('currentRound').value);
+        currentRecordsList.push({
+            round: currentRound,
+            time: parseFloat(timeValue),
+            type: 'time'
+        });
+        
+        updateDisplay();
+        saveData();
+        
+        // ラウンド自動更新
+        if (currentRound < 5) {
+            document.getElementById('currentRound').value = currentRound + 1;
+            updateRound();
+        }
+        
+        // 前回結果は次回のゴール時まで保持（リセットしない）
+        // manualTimeのみクリア
+        document.getElementById('manualTime').value = '';
+        
+        console.log(`第${currentRound}走のタイムを自動記録: ${timeValue}秒`);
+    }
+}
+
+function addRetiredRecord() {
+    const currentRound = parseInt(document.getElementById('currentRound').value);
+    currentRecordsList.push({
+        round: currentRound,
+        time: null,
+        type: 'retired'
+    });
+    
+    updateDisplay();
+    saveData();
+    
+    // ラウンド自動更新
+    if (currentRound < 5) {
+        document.getElementById('currentRound').value = currentRound + 1;
+        updateRound();
+    }
+    
+    console.log(`第${currentRound}走をリタイアとして記録`);
+}
+
+function clearCurrentRecords() {
+    if (confirm('現在の記録をすべて削除しますか？')) {
+        currentRecordsList = [];
+        updateDisplay();
+        saveData();
+    }
+}
+
+function toggleAutoRecord() {
+    autoRecordMode = document.getElementById('autoRecordMode').checked;
+    const indicator = document.getElementById('autoRecordIndicator');
+    
+    if (autoRecordMode) {
+        indicator.style.display = 'inline-block';
+        console.log('自動記録モードをONにしました');
+    } else {
+        indicator.style.display = 'none';
+        console.log('自動記録モードをOFFにしました');
+    }
+    
+    saveData();
+}
+
+// 表示更新
+function updateData() {
+    saveData();
+}
+
+function updateRound() {
+    const round = document.getElementById('currentRound').value;
+    document.getElementById('roundDisplay').textContent = round + ' / 5';
+    saveData();
+}
+
+function updateDisplay() {
+    // 現在の記録表示
+    const recordsContainer = document.getElementById('currentRecords');
+    if (currentRecordsList.length === 0) {
+        recordsContainer.innerHTML = '<div style="text-align: center; color: #718096;">記録がありません</div>';
+    } else {
+        recordsContainer.innerHTML = currentRecordsList.map((record, index) => {
+            if (record.type === 'retired') {
+                return `<div class="record-item retired">
+                    <span>第${record.round}走</span>
+                    <span style="font-weight: bold; color: #e53e3e;">R (リタイア)</span>
+                    <button class="button" onclick="removeRecord(${index})" style="padding: 5px 10px; font-size: 12px;">削除</button>
+                </div>`;
+            } else {
+                return `<div class="record-item">
+                    <span>第${record.round}走</span>
+                    <span style="font-weight: bold; color: #667eea;">${record.time.toFixed(3)}秒</span>
+                    <button class="button" onclick="removeRecord(${index})" style="padding: 5px 10px; font-size: 12px;">削除</button>
+                </div>`;
+            }
+        }).join('');
+    }
+
+    // ベストタイム表示（リタイアを除く）
+    const validTimes = currentRecordsList.filter(record => record.type === 'time').map(record => record.time);
+    if (validTimes.length > 0) {
+        const bestTime = Math.min(...validTimes);
+        document.getElementById('currentBestTime').textContent = `ベスト: ${bestTime.toFixed(3)}秒`;
+        
+        // 順位計算
+        calculateCurrentPosition(bestTime);
+    } else {
+        document.getElementById('currentBestTime').textContent = 'ベスト: --.-';
+        document.getElementById('currentPosition').textContent = '-位';
+    }
+
+    updateRankingDisplay();
+}
+
+function removeRecord(index) {
+    currentRecordsList.splice(index, 1);
+    updateDisplay();
+    saveData();
+}
+
+function calculateCurrentPosition(currentBest) {
+    let position = 1;
+    for (const entry of allRankingData) {
+        if (entry.bestTime < currentBest) {
+            position++;
+        }
+    }
+    document.getElementById('currentPosition').textContent = position + '位';
+}
+
+function updateRanking() {
+    const entryName = document.getElementById('entryName').value || '無名';
+    const entryNumber = document.getElementById('entryNumber').value || '#000';
+    const robotName = document.getElementById('robotName').value || 'ロボット';
+    
+    const validTimes = currentRecordsList.filter(record => record.type === 'time').map(record => record.time);
+    if (validTimes.length === 0) {
+        alert('有効な記録がありません。まず走行記録を追加してください。');
+        return;
+    }
+
+    const bestTime = Math.min(...validTimes);
+    
+    // 既存エントリーを更新または新規追加
+    const existingIndex = allRankingData.findIndex(entry => 
+        entry.name === entryName || entry.number === entryNumber
+    );
+    
+    if (existingIndex >= 0) {
+        allRankingData[existingIndex] = {
+            name: entryName,
+            number: entryNumber,
+            robotName: robotName,
+            bestTime: bestTime
+        };
+    } else {
+        allRankingData.push({
+            name: entryName,
+            number: entryNumber,
+            robotName: robotName,
+            bestTime: bestTime
+        });
+    }
+
+    // ソート
+    allRankingData.sort((a, b) => a.bestTime - b.bestTime);
+    
+    updateDisplay();
+    saveData();
+    alert('ランキングを更新しました！');
+}
+
+function clearRanking() {
+    if (confirm('総合ランキングをすべてクリアしますか？\nこの操作は元に戻せません。')) {
+        allRankingData = [];
+        updateDisplay();
+        saveData();
+        alert('ランキングをクリアしました。');
+    }
+}
+
+function updateRankingDisplay() {
+    const rankingContainer = document.getElementById('rankingList');
+    if (allRankingData.length === 0) {
+        rankingContainer.innerHTML = '<div style="text-align: center; color: #718096; margin: 20px 0;">ランキングデータがありません</div>';
+        return;
+    }
+
+    const top5 = allRankingData.slice(0, 5);
+    rankingContainer.innerHTML = top5.map((entry, index) => {
+        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+        const displayName = entry.robotName ? 
+            `<strong>${entry.robotName}</strong> (${entry.name})` : 
+            `<strong>${entry.name}</strong> (${entry.number})`;
+        return `<div class="ranking-item">
+            <div>
+                <span style="font-size: 1.5em;">${medals[index]}</span>
+                ${displayName}
+            </div>
+            <div style="font-size: 1.2em; font-weight: bold; color: #667eea;">
+                ${entry.bestTime.toFixed(3)}秒
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// 初期表示更新
+updateTimerDisplay();
+updateTimerButton();
+updateRound();
+
+// リアルタイム計測機能
+function startRealTimeMeasurement() {
+    measurementStartTime = performance.now(); // 高精度タイマー
+    isMeasuring = true;
+    
+    // より高速な更新を実現（複数の方法を併用）
+    updateRealTimeDisplay(); // 即座に開始
+    
+    // 補助的に高速setTimeoutも併用（可能な限り高速化）
+    if (measurementTimer) clearTimeout(measurementTimer);
+    fastUpdate();
+    
+    console.log('Web側リアルタイム計測開始');
+}
+
+function fastUpdate() {
+    if (isMeasuring) {
+        updateRealTimeDisplay();
+        // 1ms指定（実際は4-5msになる）
+        measurementTimer = setTimeout(fastUpdate, 1);
+    }
+}
+
+function stopRealTimeMeasurement() {
+    isMeasuring = false;
+    if (measurementTimer) {
+        clearTimeout(measurementTimer);
+        measurementTimer = null;
+    }
+    console.log('Web側リアルタイム計測停止');
+}
+
+function updateRealTimeDisplay() {
+    if (isMeasuring && measurementStartTime) {
+        const currentTime = performance.now();
+        const elapsedSeconds = (currentTime - measurementStartTime) / 1000;
+        document.getElementById('realtimeTimer').textContent = elapsedSeconds.toFixed(3);
+        
+        // requestAnimationFrameで次の更新をスケジュール（最高速）
+        if (isMeasuring) {
+            requestAnimationFrame(updateRealTimeDisplay);
+        }
+    }
+}
+
+// CSV関連機能
+async function loadDefaultCSV() {
+    try {
+        const response = await fetch('entry_lists.csv');
+        if (response.ok) {
+            const csvText = await response.text();
+            parseCSV(csvText);
+            console.log('デフォルトCSVファイルを読み込みました');
+        } else {
+            console.log('デフォルトCSVファイルが見つかりません');
+            // デフォルトエントリーを設定
+            entryList = [
+                { number: '#001', name: 'エントリー1', robotName: 'ロボット1' },
+                { number: '#002', name: 'エントリー2', robotName: 'ロボット2' },
+                { number: '#003', name: 'エントリー3', robotName: 'ロボット3' },
+                { number: '#004', name: 'エントリー4', robotName: 'ロボット4' },
+                { number: '#005', name: 'エントリー5', robotName: 'ロボット5' }
+            ];
+            setCurrentEntry();
+        }
+    } catch (error) {
+        console.error('CSVファイル読み込みエラー:', error);
+        // デフォルトエントリーを設定
+        entryList = [
+            { number: '#001', name: 'エントリー1', robotName: 'ロボット1' },
+            { number: '#002', name: 'エントリー2', robotName: 'ロボット2' },
+            { number: '#003', name: 'エントリー3', robotName: 'ロボット3' },
+            { number: '#004', name: 'エントリー4', robotName: 'ロボット4' },
+            { number: '#005', name: 'エントリー5', robotName: 'ロボット5' }
+        ];
+        setCurrentEntry();
+    }
+}
+
+function loadCSV() {
+    document.getElementById('csvFile').click();
+}
+
+function handleCSVFile(event) {
+    const file = event.target.files[0];
+    if (file && file.type === 'text/csv') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const csvText = e.target.result;
+            parseCSV(csvText);
+            alert('CSVファイルを読み込みました！');
+        };
+        reader.readAsText(file, 'UTF-8');
+    } else {
+        alert('CSVファイルを選択してください。');
+    }
+}
+
+function parseCSV(csvText) {
+    const lines = csvText.trim().split('\n');
+    entryList = [];
+    
+    // ヘッダー行をスキップ（1行目）
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+            const columns = line.split(',').map(col => col.trim().replace(/"/g, ''));
+            if (columns.length >= 2) {
+                entryList.push({
+                    number: columns[0],
+                    name: columns[1],
+                    robotName: columns[2] || '' // 3列目があればロボット名、なければ空文字
+                });
+            }
+        }
+    }
+    
+    currentEntryIndex = 0;
+    setCurrentEntry();
+    saveData();
+}
+
+function setCurrentEntry() {
+    if (entryList.length > 0 && currentEntryIndex < entryList.length) {
+        const entry = entryList[currentEntryIndex];
+        document.getElementById('entryNumber').value = entry.number;
+        document.getElementById('entryName').value = entry.name;
+        document.getElementById('robotName').value = entry.robotName || '';
+    }
+}
+
+function loadNextEntry() {
+    if (entryList.length === 0) {
+        alert('エントリーリストが読み込まれていません。CSVファイルを読み込んでください。');
+        return;
+    }
+
+    // 次のエントリーへ移動
+    currentEntryIndex = (currentEntryIndex + 1) % entryList.length;
+    
+    // リセット処理（総合ランキング以外）
+    resetCurrentEntryData();
+    
+    // 新しいエントリー情報を設定
+    setCurrentEntry();
+    
+    alert(`次のエントリー者: ${entryList[currentEntryIndex].name} に移動しました`);
+    saveData();
+}
+
+function resetCurrentEntryData() {
+    // 現在の記録をクリア
+    currentRecordsList = [];
+    
+    // ラウンドを1にリセット
+    document.getElementById('currentRound').value = 1;
+    
+    // タイマーをリセット
+    resetTimer();
+    
+    // 計測タイムをリセット（前回の結果を「未記録」表示）
+    document.getElementById('receivedTime').textContent = '未記録';
+    document.getElementById('manualTime').value = '';
+    
+    // 表示を更新
+    updateDisplay();
+    updateRound();
 }
